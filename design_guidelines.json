@@ -1,0 +1,127 @@
+{
+  "design_system": {
+    "identity": {
+      "name": "E1: The Anti-AI Designer",
+      "tone": "Strict, Direct, High-Performance, Anti-Slop",
+      "core_philosophy": "Discipline over Motivation. Function over Decoration.",
+      "archetype": "ARCHETYPE 2: THE PERFORMANCE PRO (Stealth/Tactical Variant)"
+    },
+    "typography": {
+      "font_families": {
+        "headings": "Barlow Condensed, sans-serif",
+        "body": "Inter, sans-serif",
+        "mono": "JetBrains Mono, monospace"
+      },
+      "import_instructions": "Add the following to index.css or index.html head: @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;700&display=swap');",
+      "usage_rules": {
+        "headings": "uppercase tracking-tighter font-black leading-none",
+        "subheadings": "uppercase tracking-[0.2em] text-xs font-semibold text-muted-foreground",
+        "body": "text-sm leading-relaxed text-zinc-400",
+        "data_display": "font-mono tabular-nums tracking-tight"
+      }
+    },
+    "colors": {
+      "theme": "dark",
+      "palette": {
+        "background": "#09090b",
+        "foreground": "#fafafa",
+        "card": "#18181b",
+        "card_foreground": "#fafafa",
+        "popover": "#09090b",
+        "popover_foreground": "#fafafa",
+        "primary": "#2563eb",
+        "primary_foreground": "#fafafa",
+        "secondary": "#27272a",
+        "secondary_foreground": "#fafafa",
+        "muted": "#27272a",
+        "muted_foreground": "#a1a1aa",
+        "accent": "#27272a",
+        "accent_foreground": "#fafafa",
+        "destructive": "#ef4444",
+        "destructive_foreground": "#fafafa",
+        "border": "#27272a",
+        "input": "#27272a",
+        "ring": "#2563eb"
+      },
+      "utility_classes": {
+        "bg_main": "bg-zinc-950",
+        "bg_card": "bg-zinc-900/50 backdrop-blur-sm",
+        "border_subtle": "border-zinc-800",
+        "text_primary": "text-zinc-50",
+        "text_secondary": "text-zinc-400",
+        "accent_glow": "shadow-[0_0_20px_-10px_rgba(37,99,235,0.5)]"
+      }
+    },
+    "layout_strategy": {
+      "grid_system": "Bento Grid Mode B (High Density)",
+      "spacing": "Generous padding (p-8 to p-12) for containers, tight gaps (gap-2) for data grids.",
+      "alignment": "Left-aligned text for readability. Centered only for the massive Timer display.",
+      "containers": "Sharp edges. No rounded corners (rounded-none or rounded-sm max). 1px borders."
+    },
+    "components": {
+      "buttons": {
+        "style": "Rectangular, Uppercase, Tracking-widest",
+        "classes": "rounded-none uppercase tracking-widest font-semibold border border-zinc-700 hover:bg-zinc-800 transition-colors duration-100",
+        "primary_classes": "bg-primary text-primary-foreground hover:bg-primary/90 border-transparent shadow-[0_0_15px_-3px_rgba(37,99,235,0.3)]"
+      },
+      "cards": {
+        "style": "Flat, Bordered, No Shadow",
+        "classes": "bg-zinc-900/40 border border-zinc-800 rounded-sm p-6"
+      },
+      "inputs": {
+        "style": "Underline or Flat Box",
+        "classes": "bg-zinc-950 border-zinc-800 focus:ring-1 focus:ring-primary rounded-none"
+      },
+      "timer": {
+        "style": "Massive Monospace",
+        "classes": "font-mono text-8xl md:text-9xl font-bold tabular-nums tracking-tighter text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.1)]"
+      }
+    },
+    "motion": {
+      "type": "Snappy, Technical",
+      "duration": "duration-100",
+      "easing": "ease-out",
+      "page_transition": "No fade. Instant cut.",
+      "hover_effects": "Instant color swap or 1px border shift. No scaling."
+    },
+    "assets": {
+      "image_urls": {
+        "hero_bg": "https://images.unsplash.com/photo-1759300631960-be501eb8ceea?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxOTJ8MHwxfHNlYXJjaHwyfHxhdGhsZXRlJTIwZm9jdXMlMjBkYXJrJTIwZ3ltJTIwc3R1ZHklMjBuaWdodCUyMG1pbmltYWxpc3QlMjBhcmNoaXRlY3R1cmUlMjBjb25jcmV0ZSUyMGFic3RyYWN0JTIwZ2VvbWV0cmljJTIwYmxhY2t8ZW58MHx8fHwxNzcyNTM5NjgwfDA&ixlib=rb-4.1.0&q=85",
+        "focus_abstract": "https://images.unsplash.com/photo-1690846014494-e2eb513355d2?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxOTJ8MHwxfHNlYXJjaHwxfHxhdGhsZXRlJTIwZm9jdXMlMjBkYXJrJTIwZ3ltJTIwc3R1ZHklMjBuaWdodCUyMG1pbmltYWxpc3QlMjBhcmNoaXRlY3R1cmUlMjBjb25jcmV0ZSUyMGFic3RyYWN0JTIwZ2VvbWV0cmljJTIwYmxhY2t8ZW58MHx8fHwxNzcyNTM5NjgwfDA&ixlib=rb-4.1.0&q=85",
+        "texture_overlay": "https://images.unsplash.com/photo-1616677424260-f29d94401454?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxOTJ8MHwxfHNlYXJjaHwzfHxhdGhsZXRlJTIwZm9jdXMlMjBkYXJrJTIwZ3ltJTIwc3R1ZHklMjBuaWdodCUyMG1pbmltYWxpc3QlMjBhcmNoaXRlY3R1cmUlMjBjb25jcmV0ZSUyMGFic3RyYWN0JTIwZ2VvbWV0cmljJTIwYmxhY2t8ZW58MHx8fHwxNzcyNTM5NjgwfDA&ixlib=rb-4.1.0&q=85"
+      },
+      "icons": {
+        "library": "lucide-react",
+        "style": "Stroke width 1.5px (Thin/Light). No fill."
+      }
+    },
+    "accessibility": {
+      "contrast": "Ensure text is Zinc-400 or lighter on Zinc-950 backgrounds.",
+      "focus_states": "Visible ring-2 ring-primary ring-offset-2 ring-offset-background on all interactive elements.",
+      "reduced_motion": "Respect prefers-reduced-motion."
+    }
+  },
+  "implementation_plan": {
+    "phase_1_setup": {
+      "action": "Configure Tailwind with new font families and color palette override.",
+      "file": "tailwind.config.js"
+    },
+    "phase_2_components": {
+      "action": "Customize Shadcn components (Button, Card, Input) to remove rounded corners and adjust borders.",
+      "path": "src/components/ui/"
+    },
+    "phase_3_pages": {
+      "landing": "Hero section with 'Concrete Walls' image, large Barlow Condensed typography.",
+      "dashboard": "Bento grid layout, dark cards, dense data display.",
+      "timer": "Fullscreen, minimal, large mono font, subtle pulsing ring."
+    }
+  },
+  "universal_guidelines": [
+    "NO EMOJIS in the UI. Use strict icons or text labels.",
+    "NO ROUNDED CORNERS > 4px. Prefer 0px or 2px.",
+    "DARK MODE ONLY. Do not implement light mode toggle for MVP.",
+    "DATA-TESTID attributes are MANDATORY for all interactive elements.",
+    "USE 'Barlow Condensed' for all headings to establish the 'Discipline' brand.",
+    "Keep animations fast (<150ms). No slow fades."
+  ]
+}
