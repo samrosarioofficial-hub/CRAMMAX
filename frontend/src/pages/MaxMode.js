@@ -151,8 +151,9 @@ const MaxMode = () => {
       setSession(response.data);
 
       if (response.data.is_completed) {
-        toast.success('Session completed!');
-        navigate('/home');
+        toast.success('Session completed! Time for verification.');
+        // Redirect to recall summary
+        navigate('/recall-summary', { state: { sessionId: session.session_id } });
       } else {
         // Move to next phase
         const nextIndex = currentPhaseIndex + 1;

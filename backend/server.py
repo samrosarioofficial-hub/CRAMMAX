@@ -65,6 +65,7 @@ class Session(BaseModel):
     is_completed: bool = False
     early_exit: bool = False
     notes: dict = {}  # {"preview": "note", "learn": "note", etc.}
+    validated: bool = False  # AI verification passed
 
 class DailyStats(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -96,6 +97,57 @@ class UserPreferences(BaseModel):
     timer_brightness: int = 100  # 0-100
     enable_sounds: bool = True
     show_on_leaderboard: bool = False
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class StudyDeclaration(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    session_id: str
+    user_id: str
+    subject: str
+    exam_board: str
+    grade: str
+    topic: str
+    study_material: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class RecallSummary(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    session_id: str
+    user_id: str
+    content: str
+    word_count: int
+    validated: bool = False
+    validation_feedback: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class Quiz(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    quiz_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    session_id: str
+    user_id: str
+    topic: str
+    questions: List[dict]  # [{"question": "...", "correct_answer": "..."}]
+    user_answers: dict = {}  # {"0": "answer", "1": "answer"}
+    score: int = 0
+    passed: bool = False
+    attempt_number: int = 1
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class KnowledgeProgress(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    user_id: str
+    subject: str
+    topic: str
+    mastery_level: int = 0  # 0-3
+    quiz_attempts: int = 0
+    quizzes_passed: int = 0
+    study_xp: int = 0
+    knowledge_xp: int = 0
+    last_studied: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 # ==================== REQUEST/RESPONSE MODELS ====================
@@ -161,6 +213,19 @@ class SaveNoteRequest(BaseModel):
 
 class GoogleAuthRequest(BaseModel):
     credential: str  # Google ID token
+
+class DeclareStudyRequest(BaseModel):
+    subject: str
+    exam_board: str
+    grade: str
+    topic: str
+    study_material: Optional[str] = None
+
+class SubmitRecallRequest(BaseModel):
+    content: str
+
+class SubmitQuizRequest(BaseModel):
+    answers: dict  # {"0": "answer1", "1": "answer2", ...}
 
 # ==================== HELPER FUNCTIONS ====================
 
@@ -281,6 +346,126 @@ Examples:
             return "Streak broken. Rebuild starting now."
         else:
             return "Maintain the pressure. Consistency is everything."
+
+async def generate_quiz(topic: str, subject: str, grade: str, exam_board: str, attempt: int = 1) -> List[dict]:
+    """Generate 5 quiz questions based on the study topic"""
+    try:
+        context = f"""
+Generate exactly 5 quiz questions for this study session:
+
+Subject: {subject}
+Exam Board: {exam_board}
+Grade/Class: {grade}
+Topic: {topic}
+Attempt Number: {attempt}
+
+Requirements:
+1. Generate 5 questions that test understanding, not just memorization
+2. Mix question types: definitions, concepts, applications, differences
+3. Questions should be clear and specific
+4. Each question should have a clear correct answer
+5. If this is attempt {attempt}, vary the questions from previous attempts
+6. Make questions progressively challenging
+
+Return in this EXACT JSON format:
+[
+  {{"question": "Question 1 text here?", "correct_answer": "Brief correct answer"}},
+  {{"question": "Question 2 text here?", "correct_answer": "Brief correct answer"}},
+  {{"question": "Question 3 text here?", "correct_answer": "Brief correct answer"}},
+  {{"question": "Question 4 text here?", "correct_answer": "Brief correct answer"}},
+  {{"question": "Question 5 text here?", "correct_answer": "Brief correct answer"}}
+]
+
+Only return the JSON array, nothing else.
+"""
+        
+        api_key = os.environ.get('EMERGENT_LLM_KEY')
+        chat = LlmChat(
+            api_key=api_key,
+            session_id=f"quiz_{topic}_{attempt}",
+            system_message="You are an educational assessment expert. Generate clear, specific quiz questions that test understanding."
+        )
+        chat.with_model("openai", "gpt-4o")
+        
+        user_message = UserMessage(text=context)
+        response = await chat.send_message(user_message)
+        
+        # Parse JSON response
+        import json
+        questions = json.loads(response.strip())
+        
+        return questions
+    except Exception as e:
+        logging.error(f"Quiz generation failed: {e}")
+        # Fallback questions
+        return [
+            {"question": f"What is the main concept of {topic}?", "correct_answer": "User should provide answer"},
+            {"question": f"Explain one key principle related to {topic}.", "correct_answer": "User should provide answer"},
+            {"question": f"How is {topic} applied in real scenarios?", "correct_answer": "User should provide answer"},
+            {"question": f"What are the components of {topic}?", "correct_answer": "User should provide answer"},
+            {"question": f"Why is {topic} important in {subject}?", "correct_answer": "User should provide answer"}
+        ]
+
+async def validate_recall_summary(content: str, topic: str, subject: str) -> tuple[bool, str]:
+    """Validate if recall summary is relevant and meaningful"""
+    try:
+        word_count = len(content.split())
+        
+        if word_count < 80:
+            return False, f"Too short. Write at least 80 words. Current: {word_count} words."
+        
+        context = f"""
+Analyze this recall summary written by a student after studying:
+
+Topic: {topic}
+Subject: {subject}
+Student's Recall:
+{content}
+
+Determine if this recall summary demonstrates genuine learning:
+
+1. Does it contain relevant concepts about the topic?
+2. Is it meaningful and not just filler text?
+3. Does it show understanding, not just copy-paste?
+4. Are there specific details mentioned?
+
+Respond in this format:
+VALID: yes/no
+FEEDBACK: One sentence feedback
+
+Example responses:
+VALID: yes
+FEEDBACK: Good recall with specific concepts mentioned.
+
+VALID: no
+FEEDBACK: Summary lacks specific concepts. Write about key principles and definitions.
+"""
+        
+        api_key = os.environ.get('EMERGENT_LLM_KEY')
+        chat = LlmChat(
+            api_key=api_key,
+            session_id=f"recall_{topic}",
+            system_message="You are an educational validator. Check if student recall is genuine and meaningful."
+        )
+        chat.with_model("openai", "gpt-4o")
+        
+        user_message = UserMessage(text=context)
+        response = await chat.send_message(user_message)
+        
+        # Parse response
+        lines = response.strip().split('\n')
+        is_valid = "yes" in lines[0].lower()
+        feedback = lines[1].replace("FEEDBACK:", "").strip() if len(lines) > 1 else "Recall validated."
+        
+        return is_valid, feedback
+    except Exception as e:
+        logging.error(f"Recall validation failed: {e}")
+        # Fallback - basic validation
+        word_count = len(content.split())
+        if word_count >= 80:
+            return True, "Recall accepted based on length."
+        else:
+            return False, f"Write at least 80 words. Current: {word_count} words."
 
 # ==================== ROUTES ====================
 
@@ -823,6 +1008,359 @@ async def export_stats(current_user: dict = Depends(get_current_user)):
     }
     
     return user_data
+
+# ==================== STUDY VERIFICATION SYSTEM ====================
+
+@api_router.post("/session/{session_id}/declare")
+async def declare_study_topic(
+    session_id: str,
+    request: DeclareStudyRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Declare what will be studied before starting MAX MODE"""
+    session = await db.sessions.find_one(
+        {"session_id": session_id, "user_id": current_user['user_id']},
+        {"_id": 0}
+    )
+    
+    if not session:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+    
+    # Create study declaration
+    declaration = StudyDeclaration(
+        session_id=session_id,
+        user_id=current_user['user_id'],
+        subject=request.subject,
+        exam_board=request.exam_board,
+        grade=request.grade,
+        topic=request.topic,
+        study_material=request.study_material
+    )
+    
+    decl_dict = declaration.model_dump()
+    decl_dict['created_at'] = decl_dict['created_at'].isoformat()
+    
+    await db.study_declarations.insert_one(decl_dict)
+    
+    return {"success": True, "message": "Study topic declared"}
+
+@api_router.post("/session/{session_id}/recall")
+async def submit_recall_summary(
+    session_id: str,
+    request: SubmitRecallRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Submit recall summary after completing session"""
+    session = await db.sessions.find_one(
+        {"session_id": session_id, "user_id": current_user['user_id']},
+        {"_id": 0}
+    )
+    
+    if not session:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+    
+    # Get study declaration
+    declaration = await db.study_declarations.find_one(
+        {"session_id": session_id},
+        {"_id": 0}
+    )
+    
+    if not declaration:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No study declaration found")
+    
+    # Validate recall summary with AI
+    is_valid, feedback = await validate_recall_summary(
+        request.content,
+        declaration['topic'],
+        declaration['subject']
+    )
+    
+    # Save recall summary
+    word_count = len(request.content.split())
+    recall = RecallSummary(
+        session_id=session_id,
+        user_id=current_user['user_id'],
+        content=request.content,
+        word_count=word_count,
+        validated=is_valid,
+        validation_feedback=feedback
+    )
+    
+    recall_dict = recall.model_dump()
+    recall_dict['created_at'] = recall_dict['created_at'].isoformat()
+    
+    await db.recall_summaries.insert_one(recall_dict)
+    
+    return {
+        "success": is_valid,
+        "validated": is_valid,
+        "feedback": feedback,
+        "word_count": word_count
+    }
+
+@api_router.post("/session/{session_id}/generate-quiz")
+async def generate_session_quiz(
+    session_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Generate AI quiz for session verification"""
+    session = await db.sessions.find_one(
+        {"session_id": session_id, "user_id": current_user['user_id']},
+        {"_id": 0}
+    )
+    
+    if not session:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+    
+    # Check if recall summary was validated
+    recall = await db.recall_summaries.find_one(
+        {"session_id": session_id, "validated": True},
+        {"_id": 0}
+    )
+    
+    if not recall:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Must submit valid recall summary first"
+        )
+    
+    # Get study declaration
+    declaration = await db.study_declarations.find_one(
+        {"session_id": session_id},
+        {"_id": 0}
+    )
+    
+    if not declaration:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No study declaration found")
+    
+    # Check existing quiz attempts
+    existing_quizzes = await db.quizzes.find(
+        {"session_id": session_id},
+        {"_id": 0}
+    ).to_list(10)
+    
+    attempt_number = len(existing_quizzes) + 1
+    
+    # Generate quiz questions
+    questions = await generate_quiz(
+        declaration['topic'],
+        declaration['subject'],
+        declaration['grade'],
+        declaration['exam_board'],
+        attempt_number
+    )
+    
+    # Create quiz
+    quiz = Quiz(
+        session_id=session_id,
+        user_id=current_user['user_id'],
+        topic=declaration['topic'],
+        questions=questions,
+        attempt_number=attempt_number
+    )
+    
+    quiz_dict = quiz.model_dump()
+    quiz_dict['created_at'] = quiz_dict['created_at'].isoformat()
+    
+    await db.quizzes.insert_one(quiz_dict)
+    
+    # Return questions without correct answers
+    quiz_questions = [
+        {"id": i, "question": q["question"]}
+        for i, q in enumerate(questions)
+    ]
+    
+    return {
+        "quiz_id": quiz.quiz_id,
+        "questions": quiz_questions,
+        "attempt_number": attempt_number
+    }
+
+@api_router.post("/session/{session_id}/submit-quiz")
+async def submit_quiz_answers(
+    session_id: str,
+    request: SubmitQuizRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Submit quiz answers and validate session"""
+    # Get latest quiz for this session
+    quiz = await db.quizzes.find_one(
+        {"session_id": session_id, "user_id": current_user['user_id']},
+        {"_id": 0},
+        sort=[("created_at", -1)]
+    )
+    
+    if not quiz:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
+    
+    # Calculate score
+    correct_count = 0
+    for idx, user_answer in request.answers.items():
+        question_idx = int(idx)
+        if question_idx < len(quiz['questions']):
+            correct_answer = quiz['questions'][question_idx]['correct_answer'].lower().strip()
+            if user_answer.lower().strip() in correct_answer or correct_answer in user_answer.lower().strip():
+                correct_count += 1
+    
+    total_questions = len(quiz['questions'])
+    score = correct_count
+    passed = score >= 3  # Need 3/5 to pass
+    
+    # Update quiz with results
+    await db.quizzes.update_one(
+        {"quiz_id": quiz['quiz_id']},
+        {"$set": {
+            "user_answers": request.answers,
+            "score": score,
+            "passed": passed
+        }}
+    )
+    
+    # Get study declaration
+    declaration = await db.study_declarations.find_one(
+        {"session_id": session_id},
+        {"_id": 0}
+    )
+    
+    if passed:
+        # Mark session as validated
+        await db.sessions.update_one(
+            {"session_id": session_id},
+            {"$set": {"validated": True}}
+        )
+        
+        # Update knowledge progress
+        knowledge = await db.knowledge_progress.find_one(
+            {
+                "user_id": current_user['user_id'],
+                "subject": declaration['subject'],
+                "topic": declaration['topic']
+            },
+            {"_id": 0}
+        )
+        
+        if knowledge:
+            # Update existing
+            quiz_attempts = knowledge['quiz_attempts'] + 1
+            quizzes_passed = knowledge['quizzes_passed'] + 1
+            study_xp = knowledge['study_xp'] + 100
+            knowledge_xp = knowledge['knowledge_xp'] + (score * 20)
+            
+            # Calculate mastery level
+            mastery_level = min(3, quizzes_passed // 3)
+            
+            await db.knowledge_progress.update_one(
+                {
+                    "user_id": current_user['user_id'],
+                    "subject": declaration['subject'],
+                    "topic": declaration['topic']
+                },
+                {"$set": {
+                    "quiz_attempts": quiz_attempts,
+                    "quizzes_passed": quizzes_passed,
+                    "study_xp": study_xp,
+                    "knowledge_xp": knowledge_xp,
+                    "mastery_level": mastery_level,
+                    "last_studied": datetime.now(timezone.utc).isoformat(),
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+        else:
+            # Create new
+            new_progress = KnowledgeProgress(
+                user_id=current_user['user_id'],
+                subject=declaration['subject'],
+                topic=declaration['topic'],
+                mastery_level=0,
+                quiz_attempts=1,
+                quizzes_passed=1,
+                study_xp=100,
+                knowledge_xp=score * 20
+            )
+            
+            progress_dict = new_progress.model_dump()
+            progress_dict['last_studied'] = progress_dict['last_studied'].isoformat()
+            progress_dict['updated_at'] = progress_dict['updated_at'].isoformat()
+            
+            await db.knowledge_progress.insert_one(progress_dict)
+    
+    return {
+        "success": passed,
+        "passed": passed,
+        "score": score,
+        "total": total_questions,
+        "message": "Session validated! Discipline score earned." if passed else "Quiz failed. Retry to validate session.",
+        "correct_answers": [q["correct_answer"] for q in quiz['questions']]
+    }
+
+@api_router.get("/knowledge-map")
+async def get_knowledge_map(current_user: dict = Depends(get_current_user)):
+    """Get user's knowledge mastery map"""
+    knowledge_items = await db.knowledge_progress.find(
+        {"user_id": current_user['user_id']},
+        {"_id": 0}
+    ).sort("updated_at", -1).to_list(100)
+    
+    # Group by subject
+    knowledge_map = {}
+    for item in knowledge_items:
+        subject = item['subject']
+        if subject not in knowledge_map:
+            knowledge_map[subject] = []
+        
+        knowledge_map[subject].append({
+            "topic": item['topic'],
+            "mastery_level": item['mastery_level'],
+            "mastery_name": ["Not Started", "Basic", "Concept Clarity", "Mastery"][item['mastery_level']],
+            "quiz_attempts": item['quiz_attempts'],
+            "quizzes_passed": item['quizzes_passed'],
+            "study_xp": item['study_xp'],
+            "knowledge_xp": item['knowledge_xp'],
+            "last_studied": item['last_studied']
+        })
+    
+    return {"knowledge_map": knowledge_map}
+
+@api_router.get("/session/{session_id}/verification-status")
+async def get_verification_status(
+    session_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Check verification status of a session"""
+    session = await db.sessions.find_one(
+        {"session_id": session_id, "user_id": current_user['user_id']},
+        {"_id": 0}
+    )
+    
+    if not session:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+    
+    # Check declaration
+    declaration = await db.study_declarations.find_one(
+        {"session_id": session_id},
+        {"_id": 0}
+    )
+    
+    # Check recall
+    recall = await db.recall_summaries.find_one(
+        {"session_id": session_id},
+        {"_id": 0}
+    )
+    
+    # Check quiz
+    quiz = await db.quizzes.find_one(
+        {"session_id": session_id, "passed": True},
+        {"_id": 0}
+    )
+    
+    return {
+        "session_id": session_id,
+        "declared": declaration is not None,
+        "recall_submitted": recall is not None,
+        "recall_validated": recall['validated'] if recall else False,
+        "quiz_passed": quiz is not None,
+        "session_validated": session.get('validated', False)
+    }
 
 # Health check
 @api_router.get("/")

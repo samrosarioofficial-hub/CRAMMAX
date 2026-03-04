@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Home as HomeIcon, BarChart3, User, MessageSquare, Trophy, Settings as SettingsIcon, Download } from 'lucide-react';
+import { Home as HomeIcon, BarChart3, User, MessageSquare, Trophy, Settings as SettingsIcon, Download, Map } from 'lucide-react';
 
 const Navigation = () => {
   const navigate = useNavigate();
@@ -9,6 +9,7 @@ const Navigation = () => {
   const navItems = [
     { path: '/home', label: 'HOME', icon: HomeIcon },
     { path: '/dashboard', label: 'DASHBOARD', icon: BarChart3 },
+    { path: '/knowledge-map', label: 'KNOWLEDGE', icon: Map },
     { path: '/leaderboard', label: 'LEADERBOARD', icon: Trophy },
     { path: '/ai-coach', label: 'AI COACH', icon: MessageSquare },
     { path: '/export', label: 'EXPORT', icon: Download },

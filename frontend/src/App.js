@@ -15,6 +15,10 @@ import AICoach from '@/pages/AICoach';
 import Settings from '@/pages/Settings';
 import Leaderboard from '@/pages/Leaderboard';
 import Export from '@/pages/Export';
+import RecallSummary from '@/pages/RecallSummary';
+import Quiz from '@/pages/Quiz';
+import QuizResult from '@/pages/QuizResult';
+import KnowledgeMap from '@/pages/KnowledgeMap';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -90,6 +94,38 @@ function App() {
             element={
               <ProtectedRoute>
                 <Export />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/recall-summary"
+            element={
+              <ProtectedRoute>
+                <RecallSummary />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/quiz"
+            element={
+              <ProtectedRoute>
+                <Quiz />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/quiz-result"
+            element={
+              <ProtectedRoute>
+                <QuizResult />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/knowledge-map"
+            element={
+              <ProtectedRoute>
+                <KnowledgeMap />
               </ProtectedRoute>
             }
           />

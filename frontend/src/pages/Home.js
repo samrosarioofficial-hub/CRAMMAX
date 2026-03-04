@@ -4,8 +4,9 @@ import { Button } from '@/components/ui/button';
 import apiClient from '@/utils/api';
 import { getUser } from '@/utils/auth';
 import { toast } from 'sonner';
-import { Play, BarChart3, User as UserIcon, MessageSquare } from 'lucide-react';
+import { Play, BarChart3, User as UserIcon, MessageSquare, Map } from 'lucide-react';
 import Navigation from '@/components/Navigation';
+import StudyDeclarationModal from '@/components/StudyDeclarationModal';
 
 const Home = () => {
   const navigate = useNavigate();
@@ -13,6 +14,7 @@ const Home = () => {
   const [stats, setStats] = useState(null);
   const [activeSession, setActiveSession] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showDeclaration, setShowDeclaration] = useState(false);
 
   useEffect(() => {
     const userData = getUser();
@@ -40,9 +42,21 @@ const Home = () => {
   };
 
   const startMaxMode = async () => {
+    setShowDeclaration(true);
+  };
+
+  const handleDeclarationSubmit = async (declarationData) => {
     try {
-      const response = await apiClient.post('/session/start');
-      navigate('/max-mode', { state: { session: response.data } });
+      // Start session first
+      const sessionResponse = await apiClient.post('/session/start');
+      const sessionId = sessionResponse.data.session_id;
+
+      // Submit declaration
+      await apiClient.post(`/session/${sessionId}/declare`, declarationData);
+
+      setShowDeclaration(false);
+      toast.success('Study topic declared!');
+      navigate('/max-mode', { state: { session: sessionResponse.data } });
     } catch (error) {
       toast.error('Failed to start session');
     }
@@ -123,7 +137,7 @@ const Home = () => {
         )}
 
         {/* Quick Links */}
-        <div className="grid md:grid-cols-3 gap-4">
+        <div className="grid md:grid-cols-4 gap-4">
           <button
             onClick={() => navigate('/dashboard')}
             className="stat-card p-6 rounded-sm text-left hover:bg-zinc-800/60 transition-colors duration-100"
@@ -153,8 +167,25 @@ const Home = () => {
             <div className="font-heading text-lg uppercase tracking-wider font-semibold mb-1">PROFILE</div>
             <div className="text-zinc-400 text-xs">View badges and level</div>
           </button>
+          
+          <button
+            onClick={() => navigate('/knowledge-map')}
+            className="stat-card p-6 rounded-sm text-left hover:bg-zinc-800/60 transition-colors duration-100"
+            data-testid="nav-knowledge-map-btn"
+          >
+            <Map className="h-8 w-8 text-primary mb-3" strokeWidth={1.5} />
+            <div className="font-heading text-lg uppercase tracking-wider font-semibold mb-1">KNOWLEDGE MAP</div>
+            <div className="text-zinc-400 text-xs">Track topic mastery</div>
+          </button>
         </div>
       </div>
+
+      {/* Study Declaration Modal */}
+      <StudyDeclarationModal
+        show={showDeclaration}
+        onClose={() => setShowDeclaration(false)}
+        onSubmit={handleDeclarationSubmit}
+      />
     </div>
   );
 };
