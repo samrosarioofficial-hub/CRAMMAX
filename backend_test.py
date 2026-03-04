@@ -173,6 +173,63 @@ class StudyMaxAPITester:
             self.log(f"AI Feedback generated: {feedback[:100]}...")
         return success, response
 
+    def test_get_preferences(self):
+        """Test getting user preferences"""
+        success, response = self.run_test("Get Preferences", "GET", "preferences", 200)
+        if success:
+            self.log(f"Preferences - Brightness: {response.get('timer_brightness', 100)}%, Sounds: {response.get('enable_sounds', True)}")
+        return success, response
+
+    def test_update_preferences(self):
+        """Test updating user preferences"""
+        preferences_data = {
+            "phase_durations": {"preview": 3, "learn": 25, "recall": 8, "test": 7},
+            "timer_brightness": 80,
+            "enable_sounds": False,
+            "show_on_leaderboard": True
+        }
+        return self.run_test("Update Preferences", "POST", "preferences", 200, data=preferences_data)
+
+    def test_save_session_note(self):
+        """Test saving session note"""
+        if not self.session_id:
+            return False, {}
+        
+        note_data = {"phase": "learn", "note": "This is a test note for the learning phase."}
+        return self.run_test(
+            "Save Session Note", 
+            "POST", 
+            f"session/{self.session_id}/note", 
+            200, 
+            data=note_data
+        )
+
+    def test_get_leaderboard(self):
+        """Test getting leaderboard data"""
+        success, response = self.run_test("Get Leaderboard", "GET", "leaderboard", 200)
+        if success:
+            leaderboard_count = len(response.get('leaderboard', []))
+            self.log(f"Leaderboard contains {leaderboard_count} users")
+        return success, response
+
+    def test_export_sessions(self):
+        """Test exporting session data as CSV"""
+        success, response = self.run_test("Export Sessions", "GET", "export/sessions", 200)
+        if success:
+            filename = response.get('filename', '')
+            content_length = len(response.get('content', ''))
+            self.log(f"Session export - File: {filename}, Size: {content_length} chars")
+        return success, response
+
+    def test_export_stats(self):
+        """Test exporting user statistics as JSON"""
+        success, response = self.run_test("Export Stats", "GET", "export/stats", 200)
+        if success:
+            user_name = response.get('name', 'Unknown')
+            stats_count = len(response.get('daily_stats', []))
+            self.log(f"Stats export - User: {user_name}, Daily stats: {stats_count} entries")
+        return success, response
+
     def run_full_test_suite(self):
         """Run the complete test suite"""
         self.log("Starting StudyMax API Test Suite", "START")
@@ -183,9 +240,9 @@ class StudyMaxAPITester:
         
         # 2. Authentication Tests
         test_user = {
-            "name": "Test User",
-            "email": "testuser@studymax.com", 
-            "password": "Test123!"
+            "name": "Alex Test",
+            "email": "alex@studymax.com", 
+            "password": "Secure123!"
         }
         
         # Try signup first (might fail if user exists)
@@ -232,6 +289,25 @@ class StudyMaxAPITester:
         # Give some time for AI generation
         self.log("Testing AI Coach generation (this may take a few seconds)...")
         self.test_ai_coach_generate()
+
+        # 8. NEW ENHANCEMENT TESTS - Preferences
+        self.log("Testing new preferences API...")
+        self.test_get_preferences()
+        self.test_update_preferences()
+
+        # 9. NEW ENHANCEMENT TESTS - Session Notes  
+        if self.session_id:
+            self.log("Testing session notes...")
+            self.test_save_session_note()
+
+        # 10. NEW ENHANCEMENT TESTS - Leaderboard
+        self.log("Testing leaderboard...")
+        self.test_get_leaderboard()
+
+        # 11. NEW ENHANCEMENT TESTS - Data Export
+        self.log("Testing data export features...")
+        self.test_export_sessions()
+        self.test_export_stats()
         
         return self.print_summary()
 

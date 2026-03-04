@@ -64,6 +64,7 @@ class Session(BaseModel):
     phases_completed: List[str] = []
     is_completed: bool = False
     early_exit: bool = False
+    notes: dict = {}  # {"preview": "note", "learn": "note", etc.}
 
 class DailyStats(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -81,6 +82,21 @@ class AIFeedback(BaseModel):
     date: str  # YYYY-MM-DD format
     feedback: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class UserPreferences(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    user_id: str
+    phase_durations: dict = {
+        "preview": 5,
+        "learn": 35,
+        "recall": 10,
+        "test": 10
+    }
+    timer_brightness: int = 100  # 0-100
+    enable_sounds: bool = True
+    show_on_leaderboard: bool = False
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 # ==================== REQUEST/RESPONSE MODELS ====================
 
@@ -132,6 +148,19 @@ class ProfileResponse(BaseModel):
 class AIFeedbackResponse(BaseModel):
     feedback: str
     date: str
+
+class UpdatePreferencesRequest(BaseModel):
+    phase_durations: Optional[dict] = None
+    timer_brightness: Optional[int] = None
+    enable_sounds: Optional[bool] = None
+    show_on_leaderboard: Optional[bool] = None
+
+class SaveNoteRequest(BaseModel):
+    phase: str
+    note: str
+
+class GoogleAuthRequest(BaseModel):
+    credential: str  # Google ID token
 
 # ==================== HELPER FUNCTIONS ====================
 
@@ -603,6 +632,197 @@ async def get_session_history(current_user: dict = Depends(get_current_user), li
     ).sort("completed_at", -1).limit(limit).to_list(limit)
     
     return {"sessions": sessions, "total": len(sessions)}
+
+# ==================== PREFERENCES ====================
+
+@api_router.get("/preferences")
+async def get_preferences(current_user: dict = Depends(get_current_user)):
+    """Get user preferences"""
+    prefs = await db.preferences.find_one(
+        {"user_id": current_user['user_id']},
+        {"_id": 0}
+    )
+    
+    if not prefs:
+        # Return defaults
+        return {
+            "phase_durations": {"preview": 5, "learn": 35, "recall": 10, "test": 10},
+            "timer_brightness": 100,
+            "enable_sounds": True,
+            "show_on_leaderboard": False
+        }
+    
+    return prefs
+
+@api_router.post("/preferences")
+async def update_preferences(
+    request: UpdatePreferencesRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update user preferences"""
+    prefs = await db.preferences.find_one({"user_id": current_user['user_id']}, {"_id": 0})
+    
+    if prefs:
+        # Update existing
+        update_data = {}
+        if request.phase_durations is not None:
+            update_data["phase_durations"] = request.phase_durations
+        if request.timer_brightness is not None:
+            update_data["timer_brightness"] = request.timer_brightness
+        if request.enable_sounds is not None:
+            update_data["enable_sounds"] = request.enable_sounds
+        if request.show_on_leaderboard is not None:
+            update_data["show_on_leaderboard"] = request.show_on_leaderboard
+        
+        update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+        
+        await db.preferences.update_one(
+            {"user_id": current_user['user_id']},
+            {"$set": update_data}
+        )
+    else:
+        # Create new
+        new_prefs = UserPreferences(
+            user_id=current_user['user_id'],
+            phase_durations=request.phase_durations or {"preview": 5, "learn": 35, "recall": 10, "test": 10},
+            timer_brightness=request.timer_brightness if request.timer_brightness is not None else 100,
+            enable_sounds=request.enable_sounds if request.enable_sounds is not None else True,
+            show_on_leaderboard=request.show_on_leaderboard if request.show_on_leaderboard is not None else False
+        )
+        
+        prefs_dict = new_prefs.model_dump()
+        prefs_dict['updated_at'] = prefs_dict['updated_at'].isoformat()
+        
+        await db.preferences.insert_one(prefs_dict)
+    
+    return {"success": True, "message": "Preferences updated"}
+
+# ==================== SESSION NOTES ====================
+
+@api_router.post("/session/{session_id}/note")
+async def save_session_note(
+    session_id: str,
+    request: SaveNoteRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Save a note for a specific phase in a session"""
+    session = await db.sessions.find_one(
+        {"session_id": session_id, "user_id": current_user['user_id']},
+        {"_id": 0}
+    )
+    
+    if not session:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+    
+    notes = session.get('notes', {})
+    notes[request.phase] = request.note
+    
+    await db.sessions.update_one(
+        {"session_id": session_id},
+        {"$set": {"notes": notes}}
+    )
+    
+    return {"success": True, "message": "Note saved"}
+
+# ==================== LEADERBOARD ====================
+
+@api_router.get("/leaderboard")
+async def get_leaderboard(limit: int = 50):
+    """Get top performers leaderboard"""
+    # Get users who opted in to leaderboard
+    opted_in_users = await db.preferences.find(
+        {"show_on_leaderboard": True},
+        {"_id": 0, "user_id": 1}
+    ).to_list(1000)
+    
+    opted_in_ids = [p['user_id'] for p in opted_in_users]
+    
+    if not opted_in_ids:
+        return {"leaderboard": []}
+    
+    # Get users with highest discipline scores
+    users = await db.users.find(
+        {"user_id": {"$in": opted_in_ids}},
+        {"_id": 0, "user_id": 1, "name": 1, "discipline_score": 1, "level": 1, "current_streak": 1, "total_sessions": 1}
+    ).sort("discipline_score", -1).limit(limit).to_list(limit)
+    
+    # Add rank
+    leaderboard = []
+    for idx, user in enumerate(users):
+        leaderboard.append({
+            "rank": idx + 1,
+            "name": user['name'],
+            "discipline_score": user['discipline_score'],
+            "level": user['level'],
+            "level_name": get_level_name(user['level']),
+            "current_streak": user['current_streak'],
+            "total_sessions": user['total_sessions']
+        })
+    
+    return {"leaderboard": leaderboard}
+
+# ==================== EXPORT DATA ====================
+
+@api_router.get("/export/sessions")
+async def export_sessions(current_user: dict = Depends(get_current_user)):
+    """Export user session data as CSV"""
+    from io import StringIO
+    import csv
+    
+    sessions = await db.sessions.find(
+        {"user_id": current_user['user_id'], "is_completed": True},
+        {"_id": 0}
+    ).sort("completed_at", -1).to_list(1000)
+    
+    # Create CSV
+    output = StringIO()
+    writer = csv.writer(output)
+    
+    # Header
+    writer.writerow(['Session ID', 'Started At', 'Completed At', 'Phases Completed', 'Notes'])
+    
+    # Data
+    for session in sessions:
+        writer.writerow([
+            session['session_id'],
+            session['started_at'],
+            session.get('completed_at', ''),
+            ', '.join(session['phases_completed']),
+            str(session.get('notes', {}))
+        ])
+    
+    csv_content = output.getvalue()
+    
+    return {
+        "filename": f"studymax_sessions_{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv",
+        "content": csv_content
+    }
+
+@api_router.get("/export/stats")
+async def export_stats(current_user: dict = Depends(get_current_user)):
+    """Export user statistics as JSON"""
+    # Get all stats
+    daily_stats = await db.daily_stats.find(
+        {"user_id": current_user['user_id']},
+        {"_id": 0}
+    ).sort("date", -1).to_list(1000)
+    
+    user_data = {
+        "user_id": current_user['user_id'],
+        "name": current_user['name'],
+        "email": current_user['email'],
+        "discipline_score": current_user['discipline_score'],
+        "level": current_user['level'],
+        "level_name": get_level_name(current_user['level']),
+        "current_streak": current_user['current_streak'],
+        "longest_streak": current_user['longest_streak'],
+        "total_sessions": current_user['total_sessions'],
+        "badges": get_badges(current_user),
+        "daily_stats": daily_stats,
+        "export_date": datetime.now(timezone.utc).isoformat()
+    }
+    
+    return user_data
 
 # Health check
 @api_router.get("/")

@@ -12,6 +12,9 @@ import MaxMode from '@/pages/MaxMode';
 import Dashboard from '@/pages/Dashboard';
 import Profile from '@/pages/Profile';
 import AICoach from '@/pages/AICoach';
+import Settings from '@/pages/Settings';
+import Leaderboard from '@/pages/Leaderboard';
+import Export from '@/pages/Export';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -63,6 +66,30 @@ function App() {
             element={
               <ProtectedRoute>
                 <AICoach />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <Settings />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/leaderboard"
+            element={
+              <ProtectedRoute>
+                <Leaderboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/export"
+            element={
+              <ProtectedRoute>
+                <Export />
               </ProtectedRoute>
             }
           />
