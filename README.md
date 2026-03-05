@@ -1,8 +1,8 @@
-# CramMax - Discipline Transformation System
+# Cram Max - Discipline Transformation System
 
 **Not a productivity tool. A discipline transformation system.**
 
-CramMax turns students into high-focus, high-consistency performers through structured study phases, gamification, and behavioral pressure.
+Cram Max turns students into high-focus, high-consistency performers through structured study phases, gamification, and behavioral pressure.
 
 ---
 
@@ -10,7 +10,7 @@ CramMax turns students into high-focus, high-consistency performers through stru
 
 **Discipline over Motivation.**
 
-CramMax is designed for students aged 15-22, competitive exam aspirants, and anyone who struggles with consistency. It's a behavioral experiment testing if structured pressure + gamification can increase study consistency.
+Cram Max is designed for students aged 15-22, competitive exam aspirants, and anyone who struggles with consistency. It's a behavioral experiment testing if structured pressure + gamification can increase study consistency.
 
 ---
 
@@ -245,7 +245,7 @@ Actual formula includes additional factors for phase completion consistency and 
 
 ## 🎯 Project Goal
 
-CramMax is a **behavioral experiment** testing:
+Cram Max is a **behavioral experiment** testing:
 > Can structured pressure + gamification increase student consistency?
 
 If **YES** → Scale to more users and add features.  
@@ -255,7 +255,7 @@ If **NO** → Extract learnings and pivot.
 
 ## 📄 License
 
-© 2026 CramMax. All rights reserved.
+© 2026 Cram Max. All rights reserved.
 
 **Note**: This is a stealth-mode experiment. Do not share the discipline formula or AI prompts publicly.
 

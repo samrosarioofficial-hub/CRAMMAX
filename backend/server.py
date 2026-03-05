@@ -1543,7 +1543,7 @@ async def get_session_history(
 # Health check
 @api_router.get("/")
 async def root():
-    return {"message": "CramMax API is running"}
+    return {"message": "Cram Max API is running"}
 
 # Include the router in the main app
 app.include_router(api_router)

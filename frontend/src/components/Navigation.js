@@ -28,7 +28,7 @@ const Navigation = () => {
             onClick={() => navigate('/home')}
             data-testid="nav-logo"
           >
-            CRAMMAX
+            CRAM MAX
           </div>
 
           {/* Nav Items */}
