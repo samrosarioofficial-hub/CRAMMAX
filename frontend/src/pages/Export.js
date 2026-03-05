@@ -49,7 +49,7 @@ const Export = () => {
     setExporting(true);
     try {
       const response = await apiClient.get('/export/stats');
-      const filename = `studymax_stats_${new Date().toISOString().split('T')[0]}.json`;
+      const filename = `crammax_stats_${new Date().toISOString().split('T')[0]}.json`;
       downloadJSON(filename, response.data);
       toast.success('Statistics exported successfully');
     } catch (error) {

@@ -28,7 +28,7 @@ const Landing = () => {
             className="font-heading font-black text-6xl md:text-8xl lg:text-9xl uppercase tracking-tighter leading-none mb-6"
             data-testid="landing-hero-title"
           >
-            STUDYMAX
+            CRAMMAX
           </h1>
           <p className="text-zinc-400 text-lg md:text-xl mb-4 max-w-2xl mx-auto leading-relaxed">
             Not a productivity tool. A discipline transformation system.

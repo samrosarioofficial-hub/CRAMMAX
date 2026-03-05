@@ -1,8 +1,8 @@
-# StudyMax - Discipline Transformation System
+# CramMax - Discipline Transformation System
 
 **Not a productivity tool. A discipline transformation system.**
 
-StudyMax turns students into high-focus, high-consistency performers through structured study phases, gamification, and behavioral pressure.
+CramMax turns students into high-focus, high-consistency performers through structured study phases, gamification, and behavioral pressure.
 
 ---
 
@@ -10,7 +10,7 @@ StudyMax turns students into high-focus, high-consistency performers through str
 
 **Discipline over Motivation.**
 
-StudyMax is designed for students aged 15-22, competitive exam aspirants, and anyone who struggles with consistency. It's a behavioral experiment testing if structured pressure + gamification can increase study consistency.
+CramMax is designed for students aged 15-22, competitive exam aspirants, and anyone who struggles with consistency. It's a behavioral experiment testing if structured pressure + gamification can increase study consistency.
 
 ---
 
@@ -126,7 +126,7 @@ Powered by **OpenAI GPT-4o** with Emergent LLM key:
 **Backend** (`/app/backend/.env`):
 ```
 MONGO_URL="mongodb://localhost:27017"
-DB_NAME="studymax_db"
+DB_NAME="crammax_db"
 CORS_ORIGINS="*"
 EMERGENT_LLM_KEY=your_emergent_key_here
 JWT_SECRET=your_secret_key_here
@@ -215,7 +215,7 @@ pytest backend_test.py
 **Test Coverage**: 100% (13/13 endpoints passing)
 
 **Test User Credentials:**
-- Email: testuser@studymax.com
+- Email: testuser@crammax.com
 - Password: Test123!
 
 ---
@@ -245,7 +245,7 @@ Actual formula includes additional factors for phase completion consistency and 
 
 ## 🎯 Project Goal
 
-StudyMax is a **behavioral experiment** testing:
+CramMax is a **behavioral experiment** testing:
 > Can structured pressure + gamification increase student consistency?
 
 If **YES** → Scale to more users and add features.  
@@ -255,7 +255,7 @@ If **NO** → Extract learnings and pivot.
 
 ## 📄 License
 
-© 2026 StudyMax. All rights reserved.
+© 2026 CramMax. All rights reserved.
 
 **Note**: This is a stealth-mode experiment. Do not share the discipline formula or AI prompts publicly.
 

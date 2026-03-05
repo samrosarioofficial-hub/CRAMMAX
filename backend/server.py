@@ -23,7 +23,7 @@ client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
 # JWT Configuration
-JWT_SECRET = os.environ.get('JWT_SECRET', 'studymax_secret_key')
+JWT_SECRET = os.environ.get('JWT_SECRET', 'crammax_secret_key')
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24 * 30  # 30 days
 
@@ -1365,7 +1365,7 @@ async def get_verification_status(
 # Health check
 @api_router.get("/")
 async def root():
-    return {"message": "StudyMax API is running"}
+    return {"message": "CramMax API is running"}
 
 # Include the router in the main app
 app.include_router(api_router)
