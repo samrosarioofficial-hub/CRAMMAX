@@ -150,6 +150,24 @@ class KnowledgeProgress(BaseModel):
     last_studied: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+class StudySession(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    session_id: str  # Reference to Session model
+    subject: str
+    topic: str
+    session_date: str  # YYYY-MM-DD format
+    start_time: datetime
+    end_time: datetime
+    duration_minutes: int
+    level_earned: int
+    quiz_score: int
+    phases_completed: int
+    recall_passed: bool
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
 # ==================== REQUEST/RESPONSE MODELS ====================
 
 class SignupRequest(BaseModel):
@@ -1229,6 +1247,12 @@ async def submit_quiz_answers(
             {"$set": {"validated": True}}
         )
         
+        # Get session details for recording
+        session_details = await db.sessions.find_one(
+            {"session_id": session_id},
+            {"_id": 0}
+        )
+        
         # Update knowledge progress
         knowledge = await db.knowledge_progress.find_one(
             {
@@ -1283,6 +1307,39 @@ async def submit_quiz_answers(
             progress_dict['updated_at'] = progress_dict['updated_at'].isoformat()
             
             await db.knowledge_progress.insert_one(progress_dict)
+        
+        # Record study session (NEW)
+        start_time = datetime.fromisoformat(session_details['started_at'])
+        end_time = datetime.now(timezone.utc)
+        duration_minutes = int((end_time - start_time).total_seconds() / 60)
+        
+        # Check if recall passed
+        recall_summary = await db.recall_summaries.find_one(
+            {"session_id": session_id, "validated": True},
+            {"_id": 0}
+        )
+        
+        study_session = StudySession(
+            user_id=current_user['user_id'],
+            session_id=session_id,
+            subject=declaration['subject'],
+            topic=declaration['topic'],
+            session_date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            start_time=start_time,
+            end_time=end_time,
+            duration_minutes=duration_minutes,
+            level_earned=current_user['level'],
+            quiz_score=score,
+            phases_completed=len(session_details.get('phases_completed', [])),
+            recall_passed=recall_summary is not None
+        )
+        
+        study_session_dict = study_session.model_dump()
+        study_session_dict['start_time'] = study_session_dict['start_time'].isoformat()
+        study_session_dict['end_time'] = study_session_dict['end_time'].isoformat()
+        study_session_dict['created_at'] = study_session_dict['created_at'].isoformat()
+        
+        await db.study_sessions.insert_one(study_session_dict)
     
     return {
         "success": passed,
@@ -1360,6 +1417,127 @@ async def get_verification_status(
         "recall_validated": recall['validated'] if recall else False,
         "quiz_passed": quiz is not None,
         "session_validated": session.get('validated', False)
+    }
+
+# ==================== STUDY SESSION TRACKING & ANALYTICS ====================
+
+@api_router.get("/analytics/daily")
+async def get_daily_analytics(current_user: dict = Depends(get_current_user)):
+    """Get today's study analytics"""
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    
+    # Get today's study sessions
+    today_sessions = await db.study_sessions.find(
+        {"user_id": current_user['user_id'], "session_date": today},
+        {"_id": 0}
+    ).to_list(100)
+    
+    total_sessions = len(today_sessions)
+    total_minutes = sum(s['duration_minutes'] for s in today_sessions)
+    
+    return {
+        "date": today,
+        "sessions_count": total_sessions,
+        "total_minutes": total_minutes,
+        "sessions": today_sessions
+    }
+
+@api_router.get("/analytics/monthly")
+async def get_monthly_analytics(current_user: dict = Depends(get_current_user)):
+    """Get monthly study analytics"""
+    # Get current month sessions
+    current_month = datetime.now(timezone.utc).strftime("%Y-%m")
+    
+    all_sessions = await db.study_sessions.find(
+        {"user_id": current_user['user_id']},
+        {"_id": 0}
+    ).to_list(10000)
+    
+    # Group by month
+    monthly_data = {}
+    for session in all_sessions:
+        month = session['session_date'][:7]  # YYYY-MM
+        if month not in monthly_data:
+            monthly_data[month] = {
+                "month": month,
+                "sessions_count": 0,
+                "total_minutes": 0
+            }
+        monthly_data[month]["sessions_count"] += 1
+        monthly_data[month]["total_minutes"] += session['duration_minutes']
+    
+    # Sort by month descending
+    monthly_list = sorted(monthly_data.values(), key=lambda x: x['month'], reverse=True)
+    
+    # Get current month data
+    current_month_data = monthly_data.get(current_month, {
+        "month": current_month,
+        "sessions_count": 0,
+        "total_minutes": 0
+    })
+    
+    return {
+        "current_month": current_month_data,
+        "all_months": monthly_list
+    }
+
+@api_router.get("/analytics/yearly")
+async def get_yearly_analytics(current_user: dict = Depends(get_current_user)):
+    """Get yearly study analytics"""
+    all_sessions = await db.study_sessions.find(
+        {"user_id": current_user['user_id']},
+        {"_id": 0}
+    ).to_list(10000)
+    
+    # Group by year
+    yearly_data = {}
+    for session in all_sessions:
+        year = session['session_date'][:4]  # YYYY
+        if year not in yearly_data:
+            yearly_data[year] = {
+                "year": year,
+                "sessions_count": 0,
+                "total_minutes": 0,
+                "total_hours": 0
+            }
+        yearly_data[year]["sessions_count"] += 1
+        yearly_data[year]["total_minutes"] += session['duration_minutes']
+    
+    # Calculate hours
+    for year_data in yearly_data.values():
+        year_data["total_hours"] = round(year_data["total_minutes"] / 60, 1)
+    
+    # Sort by year descending
+    yearly_list = sorted(yearly_data.values(), key=lambda x: x['year'], reverse=True)
+    
+    return {
+        "all_years": yearly_list,
+        "lifetime_minutes": sum(s['duration_minutes'] for s in all_sessions),
+        "lifetime_hours": round(sum(s['duration_minutes'] for s in all_sessions) / 60, 1),
+        "lifetime_sessions": len(all_sessions)
+    }
+
+@api_router.get("/sessions/history")
+async def get_session_history(
+    current_user: dict = Depends(get_current_user),
+    limit: int = 50,
+    skip: int = 0
+):
+    """Get paginated session history"""
+    sessions = await db.study_sessions.find(
+        {"user_id": current_user['user_id']},
+        {"_id": 0}
+    ).sort("session_date", -1).skip(skip).limit(limit).to_list(limit)
+    
+    total_count = await db.study_sessions.count_documents(
+        {"user_id": current_user['user_id']}
+    )
+    
+    return {
+        "sessions": sessions,
+        "total_count": total_count,
+        "limit": limit,
+        "skip": skip
     }
 
 # Health check

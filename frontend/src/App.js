@@ -19,6 +19,7 @@ import RecallSummary from '@/pages/RecallSummary';
 import Quiz from '@/pages/Quiz';
 import QuizResult from '@/pages/QuizResult';
 import KnowledgeMap from '@/pages/KnowledgeMap';
+import SessionHistory from '@/pages/SessionHistory';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -126,6 +127,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <KnowledgeMap />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/session-history"
+            element={
+              <ProtectedRoute>
+                <SessionHistory />
               </ProtectedRoute>
             }
           />
